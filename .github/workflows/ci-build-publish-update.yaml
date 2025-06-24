@@ -1,0 +1,80 @@
+name: CI - Build, Push Docker & Update Kustomize By NimbusOps
+
+on:
+  push:
+    branches:
+      - '**'  # cualquier rama
+
+env:
+  IMAGE_NAME: ghcr.io/nimbusops1/encuestapp
+  IMAGE_REPO: nimbusops1/encuestapp
+  MANIFESTS_REPO: nimbusops1/encuestapp-k8s-cloud
+
+jobs:
+  build-publish-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Obtener mensaje del último commit
+        id: commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "mensaje_commit=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
+      - name: Detectar overlay objetivo según mensaje del commit
+        id: overlay
+        run: |
+          MSG="${{ steps.commit.outputs.mensaje_commit }}"
+          if [[ "$MSG" == *"deploy-dev"* ]]; then
+            echo "overlay=dev" >> $GITHUB_OUTPUT
+          elif [[ "$MSG" == *"deploy-stg"* ]]; then
+            echo "overlay=stg" >> $GITHUB_OUTPUT
+          elif [[ "$MSG" == *"deploy-prod-approved"* ]]; then
+            echo "overlay=prod" >> $GITHUB_OUTPUT
+          else
+            echo "overlay=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cancelar si no es un commit de deploy
+        if: steps.overlay.outputs.overlay == 'none'
+        run: |
+          echo "No es un commit de deploy. Saltando pasos restantes."
+          exit 0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Definir tag de la imagen
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build & Push Docker Image
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          docker push $IMAGE_NAME:$IMAGE_TAG
+
+      - name: Clonar repo de manifiestos
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.MANIFESTS_REPO }}
+          token: ${{ secrets.K8S_REPO_PAT }}
+          path: manifests
+
+      - name: Actualizar kustomization.yaml en overlay correspondiente
+        run: |
+          cd manifests/overlays/${{ steps.overlay.outputs.overlay }}
+          kustomize edit set image $IMAGE_NAME=$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Commit y Push del manifiesto actualizado
+        run: |
+          cd manifests
+          git config user.name "GitHub Actions"
+          git config user.email "ci@github.com"
+          git commit -am "ci: update $IMAGE_NAME to $IMAGE_TAG en overlay ${{ steps.overlay.outputs.overlay }}"
+          git push
