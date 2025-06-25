@@ -1,20 +1,20 @@
-name: CI - Build, Push Docker & Update Kustomize By NimbusOps
+name: CI - Build, Push Docker & Patch Manifests By NimbusOps
 
 on:
   push:
     branches:
-      - main  # solo se ejecuta en la rama main
+      - main  # solo en rama main
 
 env:
-  IMAGE_NAME: nimbus2025/encuestapp  # Docker Hub repo
-  MANIFESTS_REPO: nimbusops1/encuestapp-k8s-cloud
+  IMAGE_NAME: nimbus2025/encuestapp
+  MANIFESTS_REPO: nimbusops1/encuestapp-k8s-infra
 
 jobs:
-  build-publish-update:
+  build-publish-patch:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout código fuente
         uses: actions/checkout@v4
 
       - name: Obtener mensaje del último commit
@@ -23,7 +23,7 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "mensaje_commit=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
-      - name: Detectar overlay objetivo según mensaje del commit
+      - name: Detectar overlay según mensaje del commit
         id: overlay
         run: |
           MSG="${{ steps.commit.outputs.mensaje_commit }}"
@@ -35,12 +35,11 @@ jobs:
             echo "overlay=prod" >> $GITHUB_OUTPUT
           else
             echo "overlay=none" >> $GITHUB_OUTPUT
-          fi
 
       - name: Cancelar si no es un commit de deploy
         if: steps.overlay.outputs.overlay == 'none'
         run: |
-          echo "No es un commit de deploy. Saltando pasos restantes."
+          echo "No es un commit de deploy. Abortando workflow."
           exit 0
 
       - name: Log in to Docker Hub
@@ -57,22 +56,26 @@ jobs:
           docker build -t $IMAGE_NAME:$IMAGE_TAG .
           docker push $IMAGE_NAME:$IMAGE_TAG
 
-      - name: Clonar repo de manifiestos
+      - name: Clonar repo de manifiestos (infra)
         uses: actions/checkout@v4
         with:
           repository: ${{ env.MANIFESTS_REPO }}
           token: ${{ secrets.K8S_REPO_PAT }}
           path: encuestapp-k8s-infra
 
-      - name: Actualizar kustomization.yaml en overlay correspondiente
+      - name: Parchar el deployment con el nuevo tag
         run: |
-          cd encuestapp-k8s-infra/overlays/${{ steps.overlay.outputs.overlay }}
-          kustomize edit set image $IMAGE_NAME=$IMAGE_NAME:$IMAGE_TAG
+          OVERLAY=${{ steps.overlay.outputs.overlay }}
+          PATCH_FILE="encuestapp-k8s-infra/overlays/$OVERLAY/patch-deployment.yaml"
 
-      - name: Commit y Push del manifiesto actualizado
+          echo "Actualizando $PATCH_FILE con tag $IMAGE_TAG"
+          sed -i "s|REPLACEME|$IMAGE_TAG|g" "$PATCH_FILE"
+
+      - name: Commit & Push de los manifiestos parchados
         run: |
           cd encuestapp-k8s-infra
-          git config user.name "GitHub Actions"
           git config user.email "ci@github.com"
-          git commit -am "ci: update $IMAGE_NAME to $IMAGE_TAG en overlay ${{ steps.overlay.outputs.overlay }}"
+          git config user.name "GitHub Actions"
+          git add overlays/${{ steps.overlay.outputs.overlay }}/patch-deployment.yaml
+          git commit -m "ci: patch image tag to $IMAGE_TAG for ${{ steps.overlay.outputs.overlay }}" || echo "Sin cambios para commitear"
           git push
