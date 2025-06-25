@@ -26,7 +26,7 @@ jobs:
       - name: Detectar overlay según mensaje del commit
         id: overlay
         run: |
-          MSG="${{ steps.commit.outputs.mensaje_commit }}"
+          MSG="Update ci-build-publish-update.yaml"
           if [[ "$MSG" == *"[deploy-dev]"* ]]; then
             echo "overlay=dev" >> $GITHUB_OUTPUT
           elif [[ "$MSG" == *"[deploy-stg]"* ]]; then
