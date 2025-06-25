@@ -7,7 +7,7 @@ on:
 
 env:
   IMAGE_NAME: nimbus2025/encuestapp
-  MANIFESTS_REPO: nimbusops1/encuestapp-k8s-infra
+  MANIFESTS_REPO: nimbusops1/encuestapp-k8s-cloud
 
 jobs:
   build-publish-patch:
@@ -62,21 +62,22 @@ jobs:
         with:
           repository: ${{ env.MANIFESTS_REPO }}
           token: ${{ secrets.K8S_REPO_PAT }}
-          path: encuestapp-k8s-infra
+          path: encuestapp-k8s-cloud
 
       - name: Parchar el deployment con el nuevo tag
         run: |
           OVERLAY=${{ steps.overlay.outputs.overlay }}
-          PATCH_FILE="encuestapp-k8s-infra/overlays/$OVERLAY/patch-deployment.yaml"
+          PATCH_FILE="encuestapp-k8s-cloud/overlays/$OVERLAY/patch-deployment.yaml"
 
           echo "Actualizando $PATCH_FILE con tag $IMAGE_TAG"
           sed -i "s|REPLACEME|$IMAGE_TAG|g" "$PATCH_FILE"
 
       - name: Commit & Push de los manifiestos parchados
         run: |
-          cd encuestapp-k8s-infra
+          cd encuestapp-k8s-cloud
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
           git add overlays/${{ steps.overlay.outputs.overlay }}/patch-deployment.yaml
           git commit -m "ci: patch image tag to $IMAGE_TAG for ${{ steps.overlay.outputs.overlay }}" || echo "Sin cambios para commitear"
           git push
+
