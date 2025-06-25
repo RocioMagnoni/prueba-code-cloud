@@ -70,7 +70,7 @@ jobs:
           PATCH_FILE="encuestapp-k8s-cloud/overlays/$OVERLAY/patch-deployment.yaml"
 
           echo "Actualizando $PATCH_FILE con tag $IMAGE_TAG"
-          sed -i "s|REPLACEME|$IMAGE_TAG|g" "$PATCH_FILE"
+          sed -i "s|image: .*/encuestapp:.*|image: $IMAGE_NAME:$IMAGE_TAG|g" "$PATCH_FILE"
 
       - name: Commit & Push de los manifiestos parchados
         run: |
