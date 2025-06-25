@@ -62,16 +62,16 @@ jobs:
         with:
           repository: ${{ env.MANIFESTS_REPO }}
           token: ${{ secrets.K8S_REPO_PAT }}
-          path: manifests
+          path: encuestapp-k8s-infra
 
       - name: Actualizar kustomization.yaml en overlay correspondiente
         run: |
-          cd manifests/overlays/${{ steps.overlay.outputs.overlay }}
+          cd encuestapp-k8s-infra/overlays/${{ steps.overlay.outputs.overlay }}
           kustomize edit set image $IMAGE_NAME=$IMAGE_NAME:$IMAGE_TAG
 
       - name: Commit y Push del manifiesto actualizado
         run: |
-          cd manifests
+          cd encuestapp-k8s-infra
           git config user.name "GitHub Actions"
           git config user.email "ci@github.com"
           git commit -am "ci: update $IMAGE_NAME to $IMAGE_TAG en overlay ${{ steps.overlay.outputs.overlay }}"
