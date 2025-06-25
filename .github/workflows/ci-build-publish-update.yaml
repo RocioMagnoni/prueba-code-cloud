@@ -3,11 +3,10 @@ name: CI - Build, Push Docker & Update Kustomize By NimbusOps
 on:
   push:
     branches:
-      - '**'  # cualquier rama
+      - main  # solo se ejecuta en la rama main
 
 env:
-  IMAGE_NAME: ghcr.io/nimbusops1/encuestapp
-  IMAGE_REPO: nimbusops1/encuestapp
+  IMAGE_NAME: nimbus2025/encuestapp  # Docker Hub repo
   MANIFESTS_REPO: nimbusops1/encuestapp-k8s-cloud
 
 jobs:
@@ -28,11 +27,11 @@ jobs:
         id: overlay
         run: |
           MSG="${{ steps.commit.outputs.mensaje_commit }}"
-          if [[ "$MSG" == *"deploy-dev"* ]]; then
+          if [[ "$MSG" == *"[deploy-dev]"* ]]; then
             echo "overlay=dev" >> $GITHUB_OUTPUT
-          elif [[ "$MSG" == *"deploy-stg"* ]]; then
+          elif [[ "$MSG" == *"[deploy-stg]"* ]]; then
             echo "overlay=stg" >> $GITHUB_OUTPUT
-          elif [[ "$MSG" == *"deploy-prod-approved"* ]]; then
+          elif [[ "$MSG" == *"[deploy-prod]"* && "$MSG" == *"[approved]"* ]]; then
             echo "overlay=prod" >> $GITHUB_OUTPUT
           else
             echo "overlay=none" >> $GITHUB_OUTPUT
@@ -44,12 +43,11 @@ jobs:
           echo "No es un commit de deploy. Saltando pasos restantes."
           exit 0
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Definir tag de la imagen
         run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
