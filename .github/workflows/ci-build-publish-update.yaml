@@ -1,4 +1,4 @@
-name: CI - Build, Push Docker & Patch Manifests By NimbusOps
+name: CI - Build, Push Docker & Patch Manifests 
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - main  # solo en rama main
 
 env:
-  IMAGE_NAME: nimbus2025/encuestapp
-  MANIFESTS_REPO: nimbusops1/encuestapp-k8s-cloud
+  IMAGE_NAME: rociomagnoni/prueba
+  MANIFESTS_REPO: RocioMagnoni/prueba-k8s-cloud
 
 jobs:
   build-publish-patch:
@@ -62,19 +62,19 @@ jobs:
         with:
           repository: ${{ env.MANIFESTS_REPO }}
           token: ${{ secrets.K8S_REPO_PAT }}
-          path: encuestapp-k8s-cloud
+          path: prueba-k8s-cloud
 
       - name: Parchar el deployment con el nuevo tag
         run: |
           OVERLAY=${{ steps.overlay.outputs.overlay }}
-          PATCH_FILE="encuestapp-k8s-cloud/overlays/$OVERLAY/patch-deployment.yaml"
+          PATCH_FILE="prueba-k8s-cloud/overlays/$OVERLAY/patch-deployment.yaml"
 
           echo "Actualizando $PATCH_FILE con tag $IMAGE_TAG"
-          sed -i "s|image: .*/encuestapp:.*|image: $IMAGE_NAME:$IMAGE_TAG|g" "$PATCH_FILE"
+          sed -i "s|image: .*/prueba:.*|image: $IMAGE_NAME:$IMAGE_TAG|g" "$PATCH_FILE"
 
       - name: Commit & Push de los manifiestos parchados
         run: |
-          cd encuestapp-k8s-cloud
+          cd prueba-k8s-cloud
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
           git add overlays/${{ steps.overlay.outputs.overlay }}/patch-deployment.yaml
