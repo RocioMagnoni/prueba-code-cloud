@@ -1,4 +1,4 @@
 # prueba-code-cloud
 - incluye el ci/workflow
-- los html
+- html como frontend
 - imagen docker
